@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Groove Machine</title>
+<meta name="description" content="Offline drum machine and strum trainer for guitar practice.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1013">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Groove">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Groove<span>Machine</span></h1>
+  <p class="tagline">Tap the pads, hit play, jam along. Space bar starts and stops.</p>
+</header>
+
+<main>
+
+  <section class="panel">
+
+    <div class="transport">
+      <button id="play" class="play" aria-label="Play">
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+        <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>
+      </button>
+
+      <div class="bpmbox">
+        <button id="bpmDown" aria-label="Slower 5 BPM">&minus;</button>
+        <input id="bpm" type="number" inputmode="numeric" min="30" max="300" step="1" value="90" aria-label="Tempo">
+        <button id="bpmUp" aria-label="Faster 5 BPM">+</button>
+        <span class="bpmlabel">BPM</span>
+      </div>
+
+      <div class="speeds" role="group" aria-label="Speed presets">
+        <button data-bpm="60">Very Slow</button>
+        <button data-bpm="75">Slow</button>
+        <button data-bpm="90">Mid</button>
+        <button data-bpm="120">Fast</button>
+        <button data-bpm="160">Flying</button>
+      </div>
+
+      <div class="spacer"></div>
+
+      <button id="tap" class="ghost" aria-label="Tap tempo">Tap</button>
+      <button id="beatsBtn" class="dark">Beats</button>
+      <button id="clearBtn" class="ghost">Clear</button>
+    </div>
+
+    <div class="grid-scroll">
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="undergrid">
+      <button id="addStrum" class="ghost small">+ Add strum/pick track</button>
+      <span class="meta" id="meta">4/4 / 8ths / Straight</span>
+      <label class="vol">
+        <span>Volume</span>
+        <input id="volume" type="range" min="0" max="100" value="100" aria-label="Master volume">
+        <output id="volOut">100%</output>
+      </label>
+    </div>
+
+    <div class="toggles">
+      <label class="sw"><input type="checkbox" id="sub16"><span class="track"></span>16th notes</label>
+      <label class="sw"><input type="checkbox" id="swing8"><span class="track"></span>Swing 8ths</label>
+      <label class="sw"><input type="checkbox" id="swing16"><span class="track"></span>Swing 16ths</label>
+      <div class="practice" role="group" aria-label="Practice mode">
+        <span class="plabel">Practice</span>
+        <button data-practice="0" class="on">Off</button>
+        <button data-practice="2">L1 &middot; 2s</button>
+        <button data-practice="3">L2 &middot; 3s</button>
+        <button data-practice="5">L3 &middot; 5s</button>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="panel">
+    <h2>Settings</h2>
+
+    <div class="settings">
+      <div class="setgroup">
+        <h3>Drums</h3>
+        <div class="chips" id="kits" role="group" aria-label="Drum kit"></div>
+      </div>
+
+      <div class="setgroup">
+        <h3>Time signature</h3>
+        <div class="chips" id="sigs" role="group" aria-label="Time signature">
+          <button data-sig="3/4">3/4</button>
+          <button data-sig="4/4" class="on">4/4</button>
+          <button data-sig="5/4">5/4</button>
+          <button data-sig="6/8">6/8</button>
+        </div>
+      </div>
+
+      <div class="setgroup">
+        <h3>Swing</h3>
+        <label class="swingrow">
+          <span class="swinglabel">Swing amount <output id="swingOut">67%</output></span>
+          <input id="swingAmt" type="range" min="50" max="80" value="67" aria-label="Swing amount">
+        </label>
+        <div class="swingstops"><span>Straight</span><span>Triplet</span><span>Heavy</span></div>
+      </div>
+
+      <div class="setgroup">
+        <h3>Auto fills</h3>
+        <label class="sw wide"><input type="checkbox" id="autoFills"><span class="track"></span>
+          <span class="swtext">Hi-hat count-in, then a fill every 4th bar.</span>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <p class="footnote" id="offlineNote">Works offline once installed to your home screen.</p>
+
+</main>
+
+<dialog id="beatsDlg">
+  <form method="dialog" class="dlghead">
+    <h2>Beats</h2>
+    <button class="x" aria-label="Close">&times;</button>
+  </form>
+  <h3>Essential grooves</h3>
+  <div class="chips wrap" id="essentials"></div>
+  <h3>My grooves <span class="dim" id="myCount"></span></h3>
+  <div class="chips wrap" id="mine"></div>
+  <form class="saverow" id="saveForm">
+    <input id="saveName" type="text" placeholder="Name this groove" maxlength="40" aria-label="Groove name">
+    <button type="submit" class="dark">Save current</button>
+  </form>
+  <p class="dim small">Saved on this device. No sign-in, no limit.</p>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+:root{
+  --bg:#0e1013;
+  --panel:#171a21;
+  --panel-2:#1e222b;
+  --pad:#262b35;
+  --pad-hi:#2f3542;
+  --line:#2b313c;
+  --text:#eef1f6;
+  --dim:#9aa4b2;
+  --hat:#f2a33c;
+  --snare:#e2605f;
+  --kick:#c850c0;
+  --strum:#4cc9f0;
+  --accent:#4cc9f0;
+  --radius:14px;
+  --headw:138px;
+  --padmin:38px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font:500 15px/1.45 ui-sans-serif,-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+main{max-width:1100px;margin:0 auto;padding:0 14px 48px}
+
+/* ---------- header ---------- */
+.topbar{max-width:1100px;margin:0 auto;padding:22px 14px 10px}
+.topbar h1{
+  margin:0;font-size:clamp(30px,8vw,54px);line-height:1;
+  font-weight:900;letter-spacing:-.02em;text-transform:uppercase;
+  color:var(--hat);
+}
+.topbar h1 span{color:var(--kick)}
+.tagline{margin:8px 0 0;color:var(--dim);font-size:13px}
+
+/* ---------- panels ---------- */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:14px;
+  margin-top:14px;
+}
+.panel h2{
+  margin:2px 0 14px;font-size:20px;font-weight:900;
+  text-transform:uppercase;letter-spacing:.02em;color:var(--hat);
+}
+h3{margin:0 0 8px;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+
+/* ---------- buttons ---------- */
+button{
+  font:inherit;font-weight:800;color:var(--text);
+  background:var(--pad);border:1px solid var(--line);
+  border-radius:999px;padding:8px 14px;cursor:pointer;
+  transition:background .12s,color .12s,transform .06s;
+  touch-action:manipulation;
+}
+button:active{transform:translateY(1px)}
+button.on{background:var(--accent);border-color:var(--accent);color:#06222c}
+button.ghost{background:transparent}
+button.dark{background:var(--panel-2)}
+button.small{font-size:12px;padding:7px 12px}
+
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.spacer{flex:1 1 auto}
+
+.play{
+  width:46px;height:46px;padding:0;flex:0 0 auto;
+  display:grid;place-items:center;border-radius:50%;
+  background:var(--hat);border-color:var(--hat);color:#2a1800;
+}
+.play svg{width:24px;height:24px;fill:currentColor}
+.play .i-stop{display:none}
+.play.playing .i-play{display:none}
+.play.playing .i-stop{display:block}
+
+.bpmbox{display:flex;align-items:center;gap:4px;background:var(--pad);border-radius:999px;padding:4px 10px 4px 4px}
+.bpmbox button{width:32px;height:32px;padding:0;background:transparent;border:0;font-size:18px;line-height:1}
+#bpm{
+  width:52px;background:transparent;border:0;color:var(--text);
+  font:900 17px/1 inherit;text-align:center;-moz-appearance:textfield;
+}
+#bpm::-webkit-outer-spin-button,#bpm::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.bpmlabel{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--dim)}
+
+.speeds{display:flex;flex-wrap:wrap;gap:6px}
+.speeds button{font-size:12px;padding:7px 12px;background:var(--pad)}
+/* needs to come after .speeds button — same specificity, so order decides */
+.speeds button.on{background:var(--accent);border-color:var(--accent);color:#06222c}
+
+/* ---------- grid ---------- */
+.grid-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+.grid{
+  display:grid;
+  grid-template-columns:var(--headw) repeat(var(--steps,8),minmax(var(--padmin),1fr));
+  gap:7px;
+  align-items:center;
+  min-width:min-content;
+}
+.row{display:contents}
+
+.rowhead{
+  position:sticky;left:0;z-index:2;
+  display:flex;align-items:center;gap:7px;
+  background:var(--panel);padding:4px 8px 4px 0;
+}
+.rowhead .name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowhead .sub{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);cursor:pointer}
+.rowhead .sub input{width:13px;height:13px;accent-color:var(--hat);margin:0}
+.iconbtn{
+  width:28px;height:28px;padding:0;flex:0 0 auto;display:grid;place-items:center;
+  background:transparent;border:0;color:var(--dim);border-radius:8px;
+}
+.iconbtn svg{width:17px;height:17px;fill:currentColor}
+.iconbtn.muted{color:#636b78}
+.headstack{min-width:0;display:flex;flex-direction:column;gap:2px}
+
+.pad{
+  height:46px;border-radius:12px;border:1px solid var(--line);
+  background:var(--pad);padding:0;position:relative;
+  display:grid;place-items:center;
+  font-size:11px;font-weight:800;color:#78818f;
+}
+.pad.beat{background:var(--pad-hi)}
+.pad.on{border-color:transparent;color:#1a1208}
+.row.hat   .pad.on{background:var(--hat)}
+.row.snare .pad.on{background:var(--snare)}
+.row.kick  .pad.on{background:var(--kick);color:#fff}
+.pad.ghosted{opacity:.45}
+/* box-shadow rather than ::after, so the playhead also shows on the
+   strum rows, where the pads are <input> elements and ::after never renders */
+.pad.cur{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+.row.muted .pad{opacity:.3}
+
+input.pad{
+  font:800 15px/1 inherit;color:var(--strum);text-align:center;
+  background:var(--pad);-webkit-appearance:none;appearance:none;
+}
+input.pad:focus{outline:2px solid var(--strum);outline-offset:1px}
+input.pad::placeholder{color:#4a525e;font-weight:600}
+
+/* ---------- under grid ---------- */
+.undergrid{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:14px}
+.meta{font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.04em}
+.vol{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--dim);text-transform:uppercase}
+.vol output{min-width:38px;text-align:right}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;height:6px;border-radius:999px;
+  background:var(--pad-hi);width:140px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--kick);border:2px solid #fff2;
+}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:var(--kick)}
+
+/* ---------- toggles ---------- */
+.toggles{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.sw{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);cursor:pointer}
+.sw input{position:absolute;opacity:0;width:0;height:0}
+.sw .track{
+  width:40px;height:23px;border-radius:999px;background:var(--pad-hi);
+  position:relative;flex:0 0 auto;transition:background .15s;
+}
+.sw .track::after{
+  content:"";position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;
+  background:#fff;transition:transform .15s;
+}
+.sw input:checked + .track{background:var(--accent)}
+.sw input:checked + .track::after{transform:translateX(17px)}
+.sw input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
+.sw.wide{align-items:flex-start}
+.sw .swtext{text-transform:none;letter-spacing:0;font-weight:600;font-size:12px;color:var(--dim);max-width:34ch}
+
+.practice{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.plabel{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);margin-right:2px}
+.practice button{font-size:11px;padding:6px 11px}
+.practice button.on{background:var(--kick);border-color:var(--kick);color:#fff}
+
+/* ---------- settings ---------- */
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font-size:12px;padding:7px 13px}
+.chips button.on{background:var(--kick);border-color:var(--kick);color:#fff}
+.swingrow{display:flex;flex-direction:column;gap:7px}
+.swinglabel{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.swingrow input[type=range]{width:100%}
+.swingstops{display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:#5e6675;text-transform:uppercase;letter-spacing:.06em;margin-top:5px}
+
+.footnote{text-align:center;color:#5e6675;font-size:11px;margin-top:20px}
+
+/* ---------- dialog ---------- */
+dialog{
+  border:1px solid var(--line);background:var(--panel);color:var(--text);
+  border-radius:20px;padding:18px;width:min(520px,92vw);
+}
+dialog::backdrop{background:rgba(0,0,0,.65)}
+.dlghead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.dlghead h2{margin:0}
+.x{width:34px;height:34px;padding:0;font-size:20px;background:var(--pad)}
+.chips.wrap{margin-bottom:16px}
+.saverow{display:flex;gap:8px;margin-top:6px}
+.saverow input{
+  flex:1;min-width:0;background:var(--pad);border:1px solid var(--line);
+  border-radius:999px;padding:9px 14px;color:var(--text);font:inherit;
+}
+.chip-del{margin-left:6px;opacity:.6;font-weight:900}
+.dim{color:var(--dim);font-weight:600}
+.small{font-size:12px}
+
+/* Long/short label pair — see labelHtml() in app.js */
+.rowhead .sm{display:none}
+
+@media (max-width:620px){
+  /* Fit a whole 8-step bar on a phone without sideways scrolling.
+     16ths still scroll, which is unavoidable and fine. */
+  :root{--headw:74px;--padmin:24px}
+  .grid{gap:5px}
+  .rowhead .lg{display:none}
+  .rowhead .sm{display:inline}
+  .rowhead{gap:4px;padding-right:5px}
+  .iconbtn{width:22px;height:22px}
+  .iconbtn svg{width:15px;height:15px}
+  .pad{height:44px;border-radius:10px}
+  .speeds button{font-size:11px;padding:6px 9px}
+  .spacer{display:none}
+  .vol{margin-left:0;width:100%}
+  .vol input[type=range]{flex:1}
+  .topbar{padding-top:14px}
+}
