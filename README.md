@@ -65,6 +65,7 @@ Turn on **Airplane Mode**, then open it from the home screen icon. It should loa
 | **Auto 8ths** | Hi-hat plays straight 8ths regardless of the pads |
 | **Tap** | Tap it a few times in rhythm to set the tempo |
 | **Beats** | Six built-in grooves, plus anything you've saved |
+| **Share** | Puts the whole current groove into a link — the way to move one from the iPhone to the iPad |
 | **16th notes** | Switches the grid from 8 pads a bar to 16 |
 | **Swing 8ths / 16ths** | Delays the off-beats by the swing amount in Settings |
 | **Practice L1–L3** | Fades the kit out for 2, 3 or 5 seconds every 4 bars and fades it back, so you have to hold tempo through the silence |
@@ -82,7 +83,15 @@ Turn on **Airplane Mode**, then open it from the home screen icon. It should loa
 | `U` | Accented upstroke |
 | `.` or blank | Rest |
 
-Two characters in one box play as two 16ths inside that beat — so `du` is a down-up pair. You can add as many strum rows as you want and mute them individually.
+Two characters in one box play as two 16ths inside that beat — so `du` is a down-up pair. You can add as many strum rows as you want, mute them individually, and tap the row name to rename it ("Verse", "Chorus pick").
+
+It opens with two strum rows, the first carrying `d . D . d . D .` so the notation explains itself.
+
+### Sharing a groove
+
+**Share** encodes the whole setup — pads, strum rows and their names, tempo, kit, time signature, swing — into a link. Opening that link loads the groove and then strips it from the address bar.
+
+Nothing is uploaded. The groove rides inside the link's `#fragment`, which browsers never send to a server; the link only goes anywhere if you hand it to someone. It's also how you get a groove from the iPhone to the iPad, since saved grooves live in each device's own storage.
 
 ### Saved grooves
 
@@ -92,7 +101,20 @@ Saved on the device with no sign-in and no limit. They survive closing the app. 
 
 ## Updating it later
 
-Edit the files, then drag the changed ones into the GitHub repo again (**Add file → Upload files**). One thing to remember: **bump the cache name in `sw.js`** — change `groove-machine-v1` to `-v2`, etc. Without that, the old service worker keeps serving the old cached copy and your changes won't show up.
+Edit the files, then drag the changed ones into the GitHub repo again (**Add file → Upload files**). One thing to remember: **bump the cache name in `sw.js`** — change `groove-machine-v2` to `-v3`, etc. Without that, the old service worker keeps serving the old cached copy and your changes won't show up.
+
+Open the app once while online after an update. It notices the new version, caches it, and reloads itself.
+
+---
+
+## If there's no sound
+
+In rough order of likelihood:
+
+1. **The side switch on the iPhone.** iOS mutes web audio with the ringer switch. The app can't override that.
+2. **It was in the background too long.** iOS doesn't just pause audio when you leave an app, it *interrupts* it, and an interrupted audio context often won't come back on its own. The app now detects this, parks the transport instead of leaving a lit play button over silence, and tells you what happened — tap play and it rebuilds the audio from scratch.
+3. **The volume slider is at zero.** The app says so in an amber line under the transport.
+4. **Bluetooth.** Check it isn't still playing to a speaker in another room.
 
 ---
 

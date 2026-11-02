@@ -1,7 +1,7 @@
 /* Service worker: precache everything on install, then serve cache-first.
    After the first load the app makes no network requests at all. */
 
-const CACHE = 'groove-machine-v1';
+const CACHE = 'groove-machine-v2';
 
 const ASSETS = [
   './',

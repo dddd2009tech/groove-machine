@@ -118,6 +118,7 @@ let drumBus, strumBus, practiceGain, volumeGain;
 function initAudio(){
   if (ctx) return;
   ctx = new (window.AudioContext || window.webkitAudioContext)();
+  ctx.onstatechange = audioStatus;
 
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);
@@ -136,6 +137,29 @@ function initAudio(){
   strumBus.connect(practiceGain);
   practiceGain.connect(volumeGain);
   volumeGain.connect(ctx.destination);
+}
+
+/* iOS doesn't just suspend an AudioContext when the app goes to the
+   background — it *interrupts* it (a call, a route change, a long spell
+   behind another app). An interrupted context often refuses to resume, and
+   its clock stops advancing, so the scheduler queues nothing and you get
+   silence behind a UI that still looks alive. Try to resume; if that fails,
+   throw the context away and build a fresh one. */
+async function resumeAudio(){
+  initAudio();
+  if (ctx.state === 'running') return true;
+
+  try { await ctx.resume(); } catch (e) { /* fall through to a rebuild */ }
+  if (ctx.state === 'running') return true;
+
+  const dead = ctx;
+  ctx = null;
+  // close() rejects a promise rather than throwing, so it has to be awaited
+  // inside the try for the catch to see it.
+  try { if (dead.state !== 'closed') await dead.close(); } catch (e) {}
+  initAudio();
+  try { await ctx.resume(); } catch (e) {}
+  return ctx.state === 'running';
 }
 
 function env(param, t, peak, decay){
@@ -226,7 +250,7 @@ function playStrum(t, ch){
 
 /* ------------------------------------------------------------- sequencer */
 
-let playing = false, timer = null;
+let playing = false, timer = null, wasPlaying = false;
 let curStep = 0, nextTime = 0, bar = 0, countIn = false;
 let lastFadeBar = -1;
 const LOOKAHEAD = 25, AHEAD = 0.12;
@@ -311,6 +335,10 @@ function advance(){
 }
 
 function scheduler(){
+  // The clock died under us — park the transport instead of leaving a lit
+  // play button over silence.
+  if (!ctx || ctx.state !== 'running'){ wasPlaying = true; stop(); audioStatus(); return; }
+
   while (nextTime < ctx.currentTime + AHEAD){
     if (curStep === 0 && !countIn && state.practice && bar > 0 && bar % 4 === 0){
       schedulePracticeFade(nextTime);
@@ -320,9 +348,9 @@ function scheduler(){
   }
 }
 
-function start(){
-  initAudio();
-  if (ctx.state === 'suspended') ctx.resume();
+async function start(){
+  if (!(await resumeAudio())){ audioStatus(); return; }
+  wasPlaying = false;
   playing = true;
   curStep = 0; bar = 0; lastFadeBar = -1;
   countIn = state.autoFills;
@@ -334,6 +362,7 @@ function start(){
   $('#play').classList.add('playing');
   $('#play').setAttribute('aria-label', 'Stop');
   requestWakeLock();
+  audioStatus();
 }
 
 function stop(){
@@ -376,9 +405,35 @@ async function requestWakeLock(){
 function releaseWakeLock(){
   try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
 }
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && playing) requestWakeLock();
+/* Coming back to the app: get the screen lock back if we're still playing,
+   and wake the audio hardware so the next tap of play is instant rather than
+   silent. Playback is not auto-restarted — nobody wants sound to burst out of
+   a phone they just unlocked. */
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible') return;
+  if (playing) requestWakeLock();
+  if (ctx && ctx.state !== 'running') await resumeAudio();
+  audioStatus();
 });
+
+/* ---------------------------------------------------------- audio status */
+
+/* One line under the transport that names the reason for silence. Without it
+   a dead context and a volume slider at zero look identical: nothing happens. */
+function audioStatus(){
+  const el = document.getElementById('audioNote');
+  if (!el) return;
+  let msg = '';
+  if (state.volume <= 0.005){
+    msg = 'Volume is at 0% — slide it up.';
+  } else if (wasPlaying && (!ctx || ctx.state !== 'running')){
+    msg = 'Sound was interrupted while the app was in the background. Tap play to start it again.';
+  } else if (ctx && ctx.state !== 'running' && !playing){
+    msg = 'Sound is asleep. Tap play to wake it.';
+  }
+  el.textContent = msg;
+  el.hidden = !msg;
+}
 
 /* -------------------------------------------------------------------- UI */
 
@@ -448,7 +503,11 @@ function renderGrid(){
     head.className = 'rowhead';
     head.innerHTML =
       `<button class="iconbtn${tr.muted?' muted':''}" data-smute="${idx}" aria-label="Mute ${tr.name}">${tr.muted?MUTED:SPEAKER}</button>` +
-      `<div class="headstack">` + labelHtml(tr.name, `S${idx+1}`) + `</div>` +
+      `<div class="headstack">` +
+        `<input class="trackname" type="text" maxlength="18" data-sname="${idx}" ` +
+        `value="${escapeHtml(tr.name)}" aria-label="Track ${idx+1} name" ` +
+        `autocapitalize="off" autocomplete="off" spellcheck="false">` +
+      `</div>` +
       `<button class="iconbtn" data-sdel="${idx}" aria-label="Remove ${tr.name}">&times;</button>`;
     row.appendChild(head);
 
@@ -505,6 +564,13 @@ $('#grid').addEventListener('change', e => {
 });
 
 $('#grid').addEventListener('input', e => {
+  const nameInp = e.target.closest('input.trackname');
+  if (nameInp){
+    // Rewrite state in place rather than re-rendering, so the caret stays put.
+    state.strums[+nameInp.dataset.sname].name = nameInp.value;
+    save();
+    return;
+  }
   const inp = e.target.closest('input.pad[data-strum]');
   if (!inp) return;
   const clean = inp.value.replace(/[^DduU.]/g, '').slice(0, 2);
@@ -513,7 +579,13 @@ $('#grid').addEventListener('input', e => {
   save();
 });
 
-function renumber(){ state.strums.forEach((t, i) => { t.name = `Strum ${i+1}`; }); }
+/* Renumber only the tracks still carrying a default name, so deleting a row
+   never renames one the user has titled themselves. */
+function renumber(){
+  state.strums.forEach((t, i) => {
+    if (/^Strum \d+$/.test(t.name)) t.name = `Strum ${i+1}`;
+  });
+}
 
 $('#addStrum').addEventListener('click', () => {
   state.strums.push({ name:`Strum ${state.strums.length+1}`, muted:false,
@@ -555,6 +627,7 @@ $('#volume').addEventListener('input', e => {
   state.volume = +e.target.value / 100;
   $('#volOut').textContent = e.target.value + '%';
   if (volumeGain) volumeGain.gain.setTargetAtTime(state.volume, ctx.currentTime, 0.01);
+  audioStatus();
   save();
 });
 
@@ -684,6 +757,65 @@ $('#saveForm').addEventListener('submit', e => {
   renderMine();
 });
 
+/* ------------------------------------------------------------- sharing */
+
+/* A groove travels as a URL fragment. The fragment never leaves the device
+   on its own — it is only ever sent if you hand the link to someone — and it
+   is how a groove gets from the iPhone to the iPad, since saved grooves live
+   in each device's own storage. */
+
+const SHARE_FIELDS = ['bpm','sig','sub','swing8','swing16','swingAmt','kit',
+                      'autoFills','autoHat','hat','snare','kick','strums'];
+
+function b64url(s){
+  return btoa(unescape(encodeURIComponent(s)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function unb64url(s){
+  const pad = s.replace(/-/g,'+').replace(/_/g,'/');
+  return decodeURIComponent(escape(atob(pad + '==='.slice((pad.length + 3) % 4))));
+}
+
+function shareUrl(){
+  const payload = {};
+  for (const f of SHARE_FIELDS) payload[f] = state[f];
+  return location.origin + location.pathname + '#g=' + b64url(JSON.stringify(payload));
+}
+
+function readShareLink(){
+  const m = /[#&]g=([A-Za-z0-9_-]+)/.exec(location.hash);
+  if (!m) return null;
+  let obj = null;
+  try { obj = JSON.parse(unb64url(m[1])); } catch(e){ return null; }
+  if (!obj || typeof obj !== 'object') return null;
+  // Take only the fields we recognise, so a mangled link can't poison state.
+  const clean = {};
+  for (const f of SHARE_FIELDS) if (f in obj) clean[f] = obj[f];
+  history.replaceState(null, '', location.pathname);
+  return clean;
+}
+
+function note(msg){
+  const el = document.getElementById('audioNote');
+  if (!el) return;
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(note._t);
+  note._t = setTimeout(audioStatus, 4000);
+}
+
+$('#shareBtn').addEventListener('click', async () => {
+  const url = shareUrl();
+  try {
+    if (navigator.share){ await navigator.share({ title:'Groove Machine', url }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(url);
+    note('Link copied. Open it on another device to load this groove.');
+  } catch (e) {
+    note('Copy this link: ' + url);
+  }
+});
+
 /* --------------------------------------------------------- persistence */
 
 let saveTimer = null;
@@ -697,6 +829,15 @@ function restore(){
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){}
   if (raw) Object.assign(state, raw);
+  else state.strums = [
+    // First run: two strum rows, like the app this replaces. One carries the
+    // first essential pattern so the notation explains itself.
+    { name:'Strum 1', muted:false, steps:['d','','D','','d','','D',''] },
+    { name:'Strum 2', muted:false, steps:new Array(8).fill('') },
+  ];
+
+  const shared = readShareLink();
+  if (shared) Object.assign(state, shared);
 
   $('#bpm').value = state.bpm;
   $('#sub16').checked  = state.sub === 16;
@@ -716,11 +857,25 @@ function restore(){
 
 restore();
 renderGrid();
+audioStatus();
 
 /* ----------------------------------------------------- service worker */
 
 if ('serviceWorker' in navigator){
+  // True only if a worker was already in charge when this page loaded, so the
+  // very first install doesn't trigger the reload below.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+
+  // A new worker took over, which means a newer version is cached. The page in
+  // front of you is still running the old files, so pick them up once.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
   });
 }
