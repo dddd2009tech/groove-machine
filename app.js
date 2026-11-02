@@ -829,12 +829,17 @@ function restore(){
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){}
   if (raw) Object.assign(state, raw);
-  else state.strums = [
-    // First run: two strum rows, like the app this replaces. One carries the
-    // first essential pattern so the notation explains itself.
-    { name:'Strum 1', muted:false, steps:['d','','D','','d','','D',''] },
-    { name:'Strum 2', muted:false, steps:new Array(8).fill('') },
-  ];
+
+  // Two strum rows, like the app this replaces. One carries the first
+  // essential pattern so the notation explains itself. This also runs for a
+  // device saved by an earlier version that opened with no strum row at all,
+  // where the trainer simply looked absent.
+  if (!Array.isArray(state.strums) || !state.strums.length){
+    state.strums = [
+      { name:'Strum 1', muted:false, steps:['d','','D','','d','','D',''] },
+      { name:'Strum 2', muted:false, steps:new Array(8).fill('') },
+    ];
+  }
 
   const shared = readShareLink();
   if (shared) Object.assign(state, shared);
