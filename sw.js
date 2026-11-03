@@ -1,7 +1,7 @@
 /* Service worker: precache everything on install, then serve cache-first.
    After the first load the app makes no network requests at all. */
 
-const CACHE = 'groove-machine-v3';
+const CACHE = 'groove-machine-v4';
 
 const ASSETS = [
   './',
@@ -33,6 +33,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
+
+  // The diagnostic page must never be served from cache — a stale copy of the
+  // thing that reports staleness is useless.
+  if (new URL(req.url).pathname.endsWith('/check.html')){
+    event.respondWith(fetch(req).catch(() => new Response(
+      'The audio check needs a connection.', { headers:{'Content-Type':'text/plain'} })));
+    return;
+  }
 
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then(hit => {

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Groove Machine — audio check</title>
+<style>
+  :root{ --bg:#0e1013; --panel:#161a20; --line:#262c35; --fg:#e8ecf2; --dim:#8b94a3;
+         --ok:#5ad67d; --bad:#ff6b6b; --warn:#f0c674; --accent:#4cc9f0; }
+  *{box-sizing:border-box}
+  body{margin:0;padding:18px;background:var(--bg);color:var(--fg);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:13px;margin:0 0 18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+        padding:14px;margin-bottom:14px}
+  .card h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;
+           color:var(--dim);margin:0 0 10px}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;
+       border-bottom:1px solid #1e232b;font-size:14px}
+  .row:last-child{border-bottom:0}
+  .row .k{color:var(--dim);flex:0 0 auto}
+  .row .v{text-align:right;word-break:break-word;font-weight:600}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  button{width:100%;padding:15px;border-radius:11px;border:1px solid var(--line);
+         background:#1d222a;color:var(--fg);font-size:16px;font-weight:700;
+         margin-top:10px;-webkit-tap-highlight-color:transparent}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06222c}
+  button.danger{background:#2a1618;border-color:#5c2b2f;color:#ffb3b3}
+  .note{font-size:13px;color:var(--dim);margin:10px 0 0}
+  .big{font-size:17px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Audio check</h1>
+<p class="sub">Open this on the phone that has no sound. Nothing here changes the app until you press a button.</p>
+
+<div class="card">
+  <h2>1 · Tap this first</h2>
+  <button class="primary" id="tone">Play a test tone</button>
+  <p class="note" id="toneNote">You should hear a steady beep for one second.</p>
+  <div id="audioRows"></div>
+</div>
+
+<div class="card">
+  <h2>2 · Which version is on this phone</h2>
+  <div id="verRows"><div class="row"><span class="k">checking…</span></div></div>
+</div>
+
+<div class="card">
+  <h2>3 · Device</h2>
+  <div id="devRows"></div>
+</div>
+
+<div class="card">
+  <h2>If the tone played but the app is silent</h2>
+  <p class="note">The app is running old cached code. This clears it and reloads from the network — your saved grooves and settings are kept.</p>
+  <button class="danger" id="reset">Clear the cache and reload the app</button>
+</div>
+
+<p class="note">The side switch on an iPhone mutes web audio. No web app can override it, so check it first if the tone above was silent too.</p>
+
+<script>
+'use strict';
+
+function rows(el, pairs){
+  el.innerHTML = pairs.map(([k, v, cls]) =>
+    `<div class="row"><span class="k">${k}</span><span class="v ${cls||''}">${v}</span></div>`
+  ).join('');
+}
+
+/* ---- 1. audio -------------------------------------------------------- */
+
+let ctx = null;
+document.getElementById('tone').addEventListener('click', async () => {
+  const info = [];
+  try {
+    // Created inside the tap, which is what iOS requires.
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const before = ctx.state;
+    if (ctx.state !== 'running') { try { await ctx.resume(); } catch(e){} }
+
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 440;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+    g.gain.setValueAtTime(0.25, ctx.currentTime + 0.9);
+    g.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 1.0);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + 1.05);
+
+    const t0 = ctx.currentTime;
+    setTimeout(() => {
+      const moved = ctx.currentTime > t0;
+      info.push(['clock advancing', moved ? 'yes' : 'NO — audio is frozen', moved ? 'ok' : 'bad']);
+      rows(document.getElementById('audioRows'), info);
+    }, 1200);
+
+    info.push(['state before tap', before, before === 'running' ? 'ok' : 'warn']);
+    info.push(['state now', ctx.state, ctx.state === 'running' ? 'ok' : 'bad']);
+    info.push(['sample rate', ctx.sampleRate + ' Hz']);
+    document.getElementById('toneNote').textContent =
+      ctx.state === 'running'
+        ? 'Context is running. If you heard nothing, it is the side switch or the volume, not the app.'
+        : 'The context refused to start. That is the bug — tell Claude what it says below.';
+  } catch (e) {
+    info.push(['error', e.name + ': ' + e.message, 'bad']);
+  }
+  rows(document.getElementById('audioRows'), info);
+});
+
+/* ---- 2. version ------------------------------------------------------ */
+
+(async () => {
+  const out = [];
+  try {
+    const names = await caches.keys();
+    out.push(['cached on this phone', names.length ? names.join(', ') : 'nothing cached',
+              names.length ? '' : 'warn']);
+  } catch (e) { out.push(['cache', 'unreadable', 'bad']); }
+
+  try {
+    const res = await fetch('sw.js?cb=' + Date.now(), { cache: 'no-store' });
+    const txt = await res.text();
+    const m = /groove-machine-v\d+/.exec(txt);
+    out.push(['latest on the server', m ? m[0] : 'could not read', m ? '' : 'bad']);
+  } catch (e) {
+    out.push(['latest on the server', 'offline — cannot check', 'warn']);
+  }
+
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    out.push(['service worker', regs.length ? (regs[0].active ? regs[0].active.state : 'installing')
+                                            : 'none registered',
+              regs.length && regs[0].active ? 'ok' : 'bad']);
+    out.push(['controlling this page', navigator.serviceWorker.controller ? 'yes' : 'no']);
+  } catch (e) { out.push(['service worker', 'unsupported', 'bad']); }
+
+  rows(document.getElementById('verRows'), out);
+})();
+
+/* ---- 3. device ------------------------------------------------------- */
+
+(() => {
+  const standalone = window.navigator.standalone === true ||
+                     window.matchMedia('(display-mode: standalone)').matches;
+  rows(document.getElementById('devRows'), [
+    ['opened as', standalone ? 'installed app' : 'Safari tab'],
+    ['screen', window.innerWidth + ' × ' + window.innerHeight],
+    ['online', navigator.onLine ? 'yes' : 'no'],
+  ]);
+})();
+
+/* ---- reset ----------------------------------------------------------- */
+
+document.getElementById('reset').addEventListener('click', async () => {
+  const b = document.getElementById('reset');
+  b.disabled = true; b.textContent = 'Clearing…';
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    const names = await caches.keys();
+    await Promise.all(names.map(n => caches.delete(n)));
+  } catch (e) {}
+  b.textContent = 'Cleared — opening the app';
+  setTimeout(() => { location.href = './?fresh=' + Date.now(); }, 700);
+});
+</script>
+</body>
+</html>
